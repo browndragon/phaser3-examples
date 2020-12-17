@@ -7,7 +7,7 @@ var config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 300 },
-            debug: false
+            debug: true
         }
     },
     scene: {
@@ -18,12 +18,21 @@ var config = {
 };
 
 var player;
+var useVelocityForMovement;
 var stars;
 var platforms;
+var movingPlatforms;
 var cursors;
-var movingPlatform;
 
 var game = new Phaser.Game(config);
+var speeds = [
+    30,
+    60,
+    90,
+    120,
+    180,
+];
+var speedCursor = 0;
 
 function preload ()
 {
@@ -40,16 +49,20 @@ function create ()
     platforms = this.physics.add.staticGroup();
 
     platforms.create(400, 568, 'ground').setScale(2).refreshBody();
+    // Create a little hillock
+    platforms.create(400, 520, 'ground').setScale(.125, 1).refreshBody();
 
     // platforms.create(600, 400, 'ground');
     // platforms.create(50, 250, 'ground');
     // platforms.create(750, 220, 'ground');
-
-    movingPlatform = this.physics.add.image(400, 400, 'ground');
-
-    movingPlatform.setImmovable(true);
-    movingPlatform.body.allowGravity = false;
-    movingPlatform.setVelocityX(50);
+    movingPlatforms = this.physics.add.group({
+        allowGravity:false,
+        frictionX:1,
+        immovable:true,
+        velocityX:50,
+    });
+    movingPlatform = movingPlatforms.create(400, 400, 'ground');
+    movingPlatform = movingPlatforms.create(475, 464, 'ground');
 
     player = this.physics.add.sprite(100, 450, 'dude');
 
@@ -91,30 +104,60 @@ function create ()
     });
 
     this.physics.add.collider(player, platforms);
-    this.physics.add.collider(player, movingPlatform);
+    this.physics.add.collider(player, movingPlatforms);
     this.physics.add.collider(stars, platforms);
-    this.physics.add.collider(stars, movingPlatform);
+    this.physics.add.collider(stars, movingPlatforms);
 
     this.physics.add.overlap(player, stars, collectStar, null, this);
 }
 
-function update ()
+function update (time, delta)
 {
+    var speed = 160;
+    if (this.input.keyboard.checkDown(cursors.shift, 250)) {
+        speedCursor = Phaser.Math.Clamp(speedCursor + 1, 0, speeds.length - 1);
+        this.physics.world.setFPS(speeds[speedCursor]);
+    }
+    if (this.input.keyboard.checkDown(cursors.space, 250)) {
+        useVelocityForMovement = !useVelocityForMovement;
+        console.log(useVelocityForMovement
+            ? 'Using velocity for movement'
+            : 'Using direct game object modification for movement'
+        );
+        player.setVelocityX(0);
+    }
     if (cursors.left.isDown)
     {
-        player.setVelocityX(-160);
+        if (useVelocityForMovement)
+        {
+            player.setVelocityX(-160);
+        }
+        else
+        {
+            player.x -= speed * delta / 1000;
+        }
 
         player.anims.play('left', true);
     }
     else if (cursors.right.isDown)
     {
-        player.setVelocityX(160);
+        if (useVelocityForMovement)
+        {
+            player.setVelocityX(160);
+        }
+        else
+        {
+            player.x += speed * delta / 1000;
+        }
 
         player.anims.play('right', true);
     }
     else
     {
-        player.setVelocityX(0);
+        if (useVelocityForMovement)
+        {
+            player.setVelocityX(0);
+        }
 
         player.anims.play('turn');
     }
@@ -123,14 +166,15 @@ function update ()
     {
         player.setVelocityY(-330);
     }
-
-    if (movingPlatform.x >= 500)
-    {
-        movingPlatform.setVelocityX(-50);
-    }
-    else if (movingPlatform.x <= 300)
-    {
-        movingPlatform.setVelocityX(50);
+    for (let movingPlatform of movingPlatforms.children.entries) {
+        if (movingPlatform.x >= 500)
+        {
+            movingPlatform.setVelocityX(-50);
+        }
+        else if (movingPlatform.x <= 300)
+        {
+            movingPlatform.setVelocityX(50);
+        }
     }
 }
 
